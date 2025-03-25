@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teacher Exam Portal</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* Existing CSS remains unchanged */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        body {
+            min-height: 100vh;
+            background-color: #f8f9fa;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background-color: #007bff;
+            color: white;
+            padding: 1rem;
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .menu-toggle {
+            position: fixed;
+            top: 70px;
+            left: 250px;
+            z-index: 1000;
+            background-color: #6c757d;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar {
+            background-color: #343a40;
+            color: white;
+            padding: 1rem;
+            width: 250px;
+            position: fixed;
+            top: 60px;
+            left: 0;
+            height: calc(100vh - 60px);
+            transition: transform 0.3s ease;
+        }
+
+        .sidebar.hidden {
+            transform: translateX(-250px);
+        }
+
+        .main-content {
+            margin-left: 250px;
+            padding: 2rem;
+            margin-top: 60px;
+        }
+
+        .section {
+            background-color: white;
+            padding: 1rem;
+            border-radius: 8px;
+            box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background-color: #007bff;
+            color: white;
+        }
+
+        .form-group {
+            background-color: white;
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+        }
+
+        input,
+        select,
+        button {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            padding: 10px;
+            border-radius: 4px;
+            transition: background 0.2s ease;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .bulk-register {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .excel-upload {
+            margin-top: 10px;
+        }
+
+        .student-status {
+            color: #28a745;
+        }
+
+        .deregister-btn {
+            background-color: #dc3545;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .status-pending {
+            color: #ffc107;
+        }
+
+        .status-approved {
+            color: #28a745;
+        }
+
+        .status-rejected {
+            color: #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Teacher Exam Portal</h1>
+        <div id="teacherInfo"></div>
+    </div>
+
+    <button class="menu-toggle" onclick="toggleMenu()">
+        <i class="fas fa-bars"></i>
+    </button>
+
+    <aside class="sidebar" id="sidebar">
+        <h2>Navigation</h2>
+        <button onclick="showSection('registerStudents')">Register Students</button>
+        <button onclick="showSection('createExam')">Create New Exam</button>
+        <button onclick="showSection('examRequests')">Exam Requests</button>
+        <button onclick="showSection('reports')">Reports</button>
+        <button onclick="logout()" style="margin-top: 20px; background: #dc3545;">Logout</button>
+    </aside>
+
+    <main class="main-content">
+        <!-- COMPLETELY BLANK ON LOAD -->
+        <div id="dynamicContent"></div>
+    </main>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.5/xlsx.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initialize data stores
+            let students = JSON.parse(localStorage.getItem('students')) || [];
+            let exams = JSON.parse(localStorage.getItem('exams')) || [];
+            let requests = JSON.parse(localStorage.getItem('requests')) || [];
+            let grades = JSON.parse(localStorage.getItem('grades')) || [];
+            let classes = JSON.parse(localStorage.getItem('classes')) || [];
+            let subjects = JSON.parse(localStorage.getItem('subjects')) || [];
+
+            // Global functions
+            window.toggleMenu = function () {
+                document.getElementById('sidebar').classList.toggle('hidden');
+                document.querySelector('.menu-toggle').classList.toggle('hidden');
+                document.querySelector('.main-content').classList.toggle('hidden');
+            };
+
+            window.showSection = function(sectionId) {
+                document.getElementById('dynamicContent').innerHTML = '';
+                switch(sectionId) {
+                    case 'registerStudents':
+                        loadRegisterStudents();
+                        break;
+                    case 'createExam':
+                        loadCreateExam();
+                        break;
+                    case 'examRequests':
+                        loadExamRequests();
+                        break;
+                    case 'reports':
+                        loadReports();
+                        break;
+                }
+            };
+
+            // Content loading functions
+            function loadRegisterStudents() {
+                document.getElementById('dynamicContent').innerHTML = `
+                    <section class="section">
+                        <h2>Register Students</h2>
+                        <div class="form-group">
+                            <div class="bulk-register">
+                                <h4>Bulk Registration Options</h4>
+                                <select id="bulkGrade"></select>
+                                <select id="bulkClass"></select>
+                                <button onclick="bulkRegisterStudents()">Register All in Selected Class</button>
+                                <div class="excel-upload">
+                                    <input type="file" id="excelFile" accept=".xlsx">
+                                    <button onclick="uploadExcel()">Upload Excel File</button>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <input type="text" id="studentName" placeholder="Student Name">
+                                <select id="studentGrade"></select>
+                                <select id="studentClass"></select>
+                                <button onclick="registerStudent()">Register Student</button>
+                            </div>
+                        </div>
+                        <table id="studentsTable">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Grade</th>
+                                    <th>Class</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </section>`;
+                populateDropdowns();
+                updateStudentsList();
+            }
+
+            function loadCreateExam() {
+                document.getElementById('dynamicContent').innerHTML = `
+                    <section class="section">
+                        <h2>Create New Exam</h2>
+                        <div class="form-group">
+                            <input type="text" id="examTitle" placeholder="Exam Title">
+                            <select id="examSubject"></select>
+                            <input type="datetime-local" id="examDate">
+                            <div id="participantsList"></div>
+                            <button onclick="createExam()">Submit for Approval</button>
+                        </div>
+                    </section>`;
+                populateDropdowns();
+                setupParticipantsSelection();
+            }
+
+            function loadExamRequests() {
+                document.getElementById('dynamicContent').innerHTML = `
+                    <section class="section">
+                        <h2>Exam Requests</h2>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Title</th>
+                                    <th>Subject</th>
+                                    <th>Date</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="requestsList"></tbody>
+                        </table>
+                    </section>`;
+                updateExamRequests();
+            }
+
+            function loadReports() {
+                document.getElementById('dynamicContent').innerHTML = `
+                    <section class="section">
+                        <h2>Exam Reports</h2>
+                        <canvas id="examChart" width="400" height="200"></canvas>
+                    </section>`;
+                initializeChart();
+            }
+
+            // Initialize with NO content
+            // Removed default section loading
+        });
+
+        // Existing data manipulation functions remain the same
+        function populateDropdowns() {
+            grades.forEach(grade => {
+                const option = document.createElement('option');
+                option.value = grade;
+                option.textContent = grade;
+                document.getElementById('studentGrade').appendChild(option);
+                document.getElementById('bulkGrade').appendChild(option);
+            });
+
+            classes.forEach(cl => {
+                const option = document.createElement('option');
+                option.value = cl;
+                option.textContent = cl;
+                document.getElementById('studentClass').appendChild(option);
+                document.getElementById('bulkClass').appendChild(option);
+            });
+
+            subjects.forEach(sub => {
+                const option = document.createElement('option');
+                option.value = sub;
+                option.textContent = sub;
+                document.getElementById('examSubject').appendChild(option);
+            });
+        }
+
+        function bulkRegisterStudents() {
+            const grade = document.getElementById('bulkGrade').value;
+            const classVal = document.getElementById('bulkClass').value;
+
+            const bulkStudents = [
+                { name: 'John Doe', grade, class: classVal },
+                { name: 'Jane Doe', grade, class: classVal }
+            ];
+
+            students = students.concat(bulkStudents);
+            localStorage.setItem('students', JSON.stringify(students));
+            updateStudentsList();
+        }
+
+        function uploadExcel() {
+            const fileInput = document.getElementById('excelFile');
+            const file = fileInput.files[0];
+
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const data = e.target.result;
+                const workbook = XLSX.read(data, { type: 'binary' });
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                const studentsData = XLSX.utils.sheet_to_json(sheet);
+
+                students = students.concat(studentsData);
+                localStorage.setItem('students', JSON.stringify(students));
+                updateStudentsList();
+            };
+            reader.readAsBinaryString(file);
+        }
+
+        function registerStudent() {
+            const student = {
+                name: document.getElementById('studentName').value,
+                grade: document.getElementById('studentGrade').value,
+                class: document.getElementById('studentClass').value,
+                status: 'active'
+            };
+
+            students.push(student);
+            localStorage.setItem('students', JSON.stringify(students));
+            updateStudentsList();
+            clearStudentForm();
+        }
+
+        function updateStudentsList() {
+            const tbody = document.querySelector('#studentsTable tbody');
+            tbody.innerHTML = '';
+
+            students.forEach(student => {
+                tbody.innerHTML += `
+                <tr>
+                    <td>${student.name}</td>
+                    <td>${student.grade}</td>
+                    <td>${student.class}</td>
+                    <td class="student-status">${student.status}</td>
+                    <td>
+                        <button class="deregister-btn" onclick="deregisterStudent('${student.name}')">Deregister</button>
+                    </td>
+                </tr>
+            `;
+            });
+        }
+
+        function deregisterStudent(name) {
+            students = students.filter(student => student.name !== name);
+            localStorage.setItem('students', JSON.stringify(students));
+            updateStudentsList();
+        }
+
+        function createExam() {
+            const exam = {
+                id: Date.now(),
+                title: document.getElementById('examTitle').value,
+                subject: document.getElementById('examSubject').value,
+                date: document.getElementById('examDate').value,
+                participants: getSelectedParticipants(),
+                status: 'pending',
+                results: {}
+            };
+
+            exams.push(exam);
+            requests.push({ ...exam, status: 'pending' });
+
+            localStorage.setItem('exams', JSON.stringify(exams));
+            localStorage.setItem('requests', JSON.stringify(requests));
+
+            updateExamRequests();
+            clearExamForm();
+        }
+
+        function getSelectedParticipants() {
+            return students
+                .map((_, index) => document.getElementById(`participant-${index}`))
+                .filter(checkbox => checkbox?.checked)
+                .map(checkbox => checkbox.value);
+        }
+
+        function setupParticipantsSelection() {
+            const container = document.getElementById('participantsList');
+            container.innerHTML = '<h3>Select Participants:</h3>';
+
+            students.forEach((student, index) => {
+                container.innerHTML += `
+                <label>
+                    <input type="checkbox" id="participant-${index}" value="${student.name}">
+                    ${student.name} (${student.class})
+                </label><br>
+            `;
+            });
+        }
+
+        function updateExamRequests() {
+            const tbody = document.getElementById('requestsList');
+            tbody.innerHTML = '';
+
+            requests.forEach(request => {
+                tbody.innerHTML += `
+                <tr>
+                    <td>${request.title}</td>
+                    <td>${request.subject}</td>
+                    <td>${new Date(request.date).toLocaleString()}</td>
+                    <td class="status-${request.status}">${request.status.toUpperCase()}</td>
+                </tr>
+            `;
+            });
+        }
+
+        function initializeChart() {
+            const ctx = document.getElementById('examChart');
+            if (!ctx) return;
+
+            new Chart(ctx.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: ['Total Exams', 'Approved', 'Pending', 'Completed'],
+                    datasets: [{
+                        label: 'Exam Statistics',
+                        data: [
+                            exams.length,
+                            exams.filter(e => e.status === 'approved').length,
+                            exams.filter(e => e.status === 'pending').length,
+                            exams.filter(e => e.status === 'completed').length
+                        ],
+                        backgroundColor: [
+                            '#007bff',
+                            '#28a745',
+                            '#ffc107',
+                            '#dc3545'
+                        ]
+                    }]
+                }
+            });
+        }
+
+        function clearStudentForm() {
+            document.getElementById('studentName').value = '';
+            document.getElementById('studentGrade').value = '';
+            document.getElementById('studentClass').value = '';
+        }
+
+        function clearExamForm() {
+            document.getElementById('examTitle').value = '';
+            document.getElementById('examSubject').value = '';
+            document.getElementById('examDate').value = '';
+        }
+    </script>
+</body>
+</html>
