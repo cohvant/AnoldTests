@@ -2,6 +2,7 @@ var API_URL = "https://localhost:7086/"
 const ApplicationLoginForm = document.getElementById("loginForm");
 
 ApplicationLoginForm.addEventListener("submit", async (event) => {
+  alert("Called the click event");
   event.preventDefault(); // Prevent the default ApplicationLoginForm submission
 
   // Collect ApplicationLoginForm data
